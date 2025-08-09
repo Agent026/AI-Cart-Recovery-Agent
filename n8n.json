@@ -1,0 +1,495 @@
+{
+  "name": "My workflow 3",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -432,
+        128
+      ],
+      "id": "26f510f1-32fe-4f68-b5dd-011fc5281580",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "products",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        112
+      ],
+      "id": "6f298faa-8f15-4805-b4f9-fdd04dc583eb",
+      "name": "getCart",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TFD8lo5tzCMPb0zg",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ new Date().getTime() - new Date($json.updated_at).getTime() > 86400000 }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "isTrue"
+              }
+            },
+            {
+              "id": "8dab98a5-d3d0-4469-9d0c-f304c848fe9b",
+              "leftValue": "={{ new Date().getTime() - new Date($json.updated_at).getTime() > 86400000 }}\n",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "47972104-cdd3-4d59-8c71-c5b00d7ce8e9",
+      "name": "If (Abandoned?)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.price }}",
+              "rightValue": "={{ $json.old_price }}",
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        240
+      ],
+      "id": "69b0f6a9-817f-4741-9862-8e2c8d600964",
+      "name": "If (Price Dropped?)",
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        640,
+        128
+      ],
+      "id": "53d023a3-d4fb-4401-9add-c5bedd2b9bce",
+      "name": "Merge Results"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ✅ Fallback names if username is missing\nconst fallbackNames = [\n  'Smart Shopper', 'Friend', 'Legend', 'Chambo', 'Bargain Hunter',\n  'Boss', 'Style Icon', 'Deal Seeker', 'Savvy Buyer', 'Champ',\n  'Deal Ninja', 'Slick Saver', 'Quick Picker', 'Flash Buyer'\n];\n\n// ✅ Safe access + fallback values\nconst username = $json.username || fallbackNames[Math.floor(Math.random() * fallbackNames.length)];\nconst product = $json.name || 'your favorite item';\nconst oldPrice = Number($json.old_price) || 0;\nconst newPrice = Number($json.price) || 0;\nconst discount = oldPrice - newPrice;\nconst url = $json.product_url || 'https://yourshop.com/product/' + ($json.id || '');\nconst imageUrl = $json.image_url || 'https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png';\n\nconst chatInput = `Create a fun, short message to encourage the user to buy the ${product} that had a price drop from ₹${oldPrice} to ₹${newPrice}. The new discount is ₹${discount}. Address the user as ${username}. Make sure to include the URL for the product: ${url}`; \n\n// ✅ Final Output\nreturn {\n    json: {\n      chatInput: chatInput,\n      photoUrl: imageUrl,\n      product_url: url\n    }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        128
+      ],
+      "id": "bf4362be-c2fd-4e32-a95c-4a667eea5621",
+      "name": "GenerateMsg"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "5426444130",
+        "file": "={{ $json.photoUrl }}",
+        "additionalFields": {
+          "caption": "={{ $json.chatInput }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1880,
+        128
+      ],
+      "id": "telegram-photo",
+      "name": "Telegram Send Photo",
+      "webhookId": "d3d38851-68ee-443a-ac50-7ecd67bdceec",
+      "credentials": {
+        "telegramApi": {
+          "id": "ReOCJJ3YgfNYh3mW",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Remove duplicates based on product ID\nconst seen = new Set();\nconst unique = [];\n\nfor (const item of items) {\n  const id = item.json.id;\n  if (!seen.has(id)) {\n    seen.add(id);\n    unique.push(item);\n  }\n}\n\nreturn unique;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        128
+      ],
+      "id": "43769ed8-8a52-49a6-8b11-d58c6627270f",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "input": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "You are a helpful assistant that writes fun and engaging marketing messages for price drops on products."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1312,
+        128
+      ],
+      "id": "f6253aef-1c7c-4902-9238-beb34ee02366",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-1.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1184,
+        336
+      ],
+      "id": "25fcef8c-65a6-43f1-a1d2-2d931d3f1923",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "oDKgl7z4K4J0LhHn",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "removed_cart_items"
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        1472,
+        336
+      ],
+      "id": "4da0102a-81c3-4ff2-b23a-46b529aa2842",
+      "name": "Create a row in Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TFD8lo5tzCMPb0zg",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "global-session",
+        "key": "chatMemory"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1328,
+        336
+      ],
+      "id": "33b27b97-1a3d-4e5e-a9b2-038b5decc4b2",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ !!$json.photoUrl }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "isTrue"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1700,
+        128
+      ],
+      "id": "if-photo-exists",
+      "name": "If Photo Exists"
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "5426444130",
+        "text": "={{ $json.chatInput }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1900,
+        0
+      ],
+      "id": "telegram-text",
+      "name": "Telegram Send Text",
+      "credentials": {
+        "telegramApi": {
+          "id": "ReOCJJ3YgfNYh3mW",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Preserve the image URL and product URL from earlier steps\nconst photoUrl = $json.photoUrl || null;\nconst productUrl = $json.product_url || null;\n\n// Gemini's output field can be 'output', 'text', or 'chatInput'\nconst geminiOutput = $json.output || $json.text || $json.chatInput || \"No message generated\";\n\n// Construct the final message, including the product URL as a clickable link\nlet finalMessage = geminiOutput;\nif (productUrl) {\n    finalMessage += `\\n\\nShop now: ${productUrl}`;\n}\n\n// Create a new JSON object with the desired keys\nreturn {\n    json: {\n      chatInput: finalMessage,\n      photoUrl: photoUrl\n    }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        128
+      ],
+      "id": "a90408d6-6815-4672-882d-e215442ed3b9",
+      "name": "Merge Gemini Output"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "getCart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "getCart": {
+      "main": [
+        [
+          {
+            "node": "If (Abandoned?)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If (Price Dropped?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Abandoned?)": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Price Dropped?)": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GenerateMsg": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Send Photo": {
+      "main": [
+        []
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "GenerateMsg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge Gemini Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row in Supabase": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Photo Exists": {
+      "main": [
+        [
+          {
+            "node": "Telegram Send Photo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram Send Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Send Text": {
+      "main": [
+        []
+      ]
+    },
+    "Merge Gemini Output": {
+      "main": [
+        [
+          {
+            "node": "If Photo Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "13a7dd29-e5d7-4e87-a19a-8a2b9c206891",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ce520734e2bd138dac80c0d5fbe5ebe8c903f35cd3ac608f5e676800e6b70748"
+  },
+  "id": "IINEKdJ4UhhjVb97",
+  "tags": []
+}
